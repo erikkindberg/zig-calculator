@@ -124,18 +124,22 @@ pub fn main() !void {
                 Command.Add => {
                     const result = try addition(tokens.items[1..], allocator);
                     try stdout.print("{s}\n", .{result});
+                    allocator.free(result);
                 },
                 Command.Subtract => {
                     const result = try subtraction(tokens.items[1..], allocator);
                     try stdout.print("{s}\n", .{result});
+                    allocator.free(result);
                 },
                 Command.Multiply => {
                     const result = try multiplication(tokens.items[1..], allocator);
                     try stdout.print("{s}\n", .{result});
+                    allocator.free(result);
                 },
                 Command.Divide => {
                     const result = try division(tokens.items[1..], allocator);
                     try stdout.print("{s}\n", .{result});
+                    allocator.free(result);
                 },
                 Command.Help => try stdout.print("Help\n", .{}),
                 Command.Unknown => try stdout.print("Unknown Command\n", .{}),

@@ -5,13 +5,13 @@ const Command = enum { Exit, Add, Subtract, Multiply, Divide, Help, Unknown };
 fn parseCommand(input: []const u8) Command {
     if (std.mem.eql(u8, input, "exit")) {
         return Command.Exit;
-    } else if (std.mem.eql(u8, input, "add")) {
+    } else if (std.mem.eql(u8, input, "+")) {
         return Command.Add;
-    } else if (std.mem.eql(u8, input, "subtract")) {
+    } else if (std.mem.eql(u8, input, "-")) {
         return Command.Subtract;
-    } else if (std.mem.eql(u8, input, "multiply")) {
+    } else if (std.mem.eql(u8, input, "*")) {
         return Command.Multiply;
-    } else if (std.mem.eql(u8, input, "divide")) {
+    } else if (std.mem.eql(u8, input, "/")) {
         return Command.Divide;
     } else if (std.mem.eql(u8, input, "help")) {
         return Command.Help;
@@ -39,48 +39,48 @@ fn floatToString(value: f32, allocator: std.mem.Allocator) ![]const u8 {
 }
 
 fn addition(input: [][]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    if (input.len != 2) {
+    if (input.len != 3) {
         return error.InvalidInput;
     }
 
     const first: i32 = try castAsInt(input[0]);
-    const second: i32 = try castAsInt(input[1]);
+    const second: i32 = try castAsInt(input[2]);
     const sum: i32 = first + second;
 
     return try intToString(sum, allocator);
 }
 
 fn subtraction(input: [][]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    if (input.len != 2) {
+    if (input.len != 3) {
         return error.InvalidInput;
     }
 
     const first: i32 = try castAsInt(input[0]);
-    const second: i32 = try castAsInt(input[1]);
+    const second: i32 = try castAsInt(input[2]);
     const difference: i32 = first - second;
 
     return try intToString(difference, allocator);
 }
 
 fn multiplication(input: [][]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    if (input.len != 2) {
+    if (input.len != 3) {
         return error.InvalidInput;
     }
 
     const first: i32 = try castAsInt(input[0]);
-    const second: i32 = try castAsInt(input[1]);
+    const second: i32 = try castAsInt(input[2]);
     const product: i32 = first * second;
 
     return try intToString(product, allocator);
 }
 
 fn division(input: [][]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    if (input.len != 2) {
+    if (input.len != 3) {
         return error.InvalidInput;
     }
 
     const first: f32 = try castAsFloat(input[0]);
-    const second: f32 = try castAsFloat(input[1]);
+    const second: f32 = try castAsFloat(input[2]);
 
     if (@abs(second) < 1e-10) {
         return error.DivisionByZero;
@@ -117,27 +117,27 @@ pub fn main() !void {
 
             std.debug.print("tokens: {s}\n", .{tokens.items});
 
-            const command = parseCommand(tokens.items[0]);
+            const command = parseCommand(tokens.items[1]);
 
             switch (command) {
                 Command.Exit => try stdout.print("Exit\n", .{}),
                 Command.Add => {
-                    const result = try addition(tokens.items[1..], allocator);
+                    const result = try addition(tokens.items, allocator);
                     try stdout.print("{s}\n", .{result});
                     allocator.free(result);
                 },
                 Command.Subtract => {
-                    const result = try subtraction(tokens.items[1..], allocator);
+                    const result = try subtraction(tokens.items, allocator);
                     try stdout.print("{s}\n", .{result});
                     allocator.free(result);
                 },
                 Command.Multiply => {
-                    const result = try multiplication(tokens.items[1..], allocator);
+                    const result = try multiplication(tokens.items, allocator);
                     try stdout.print("{s}\n", .{result});
                     allocator.free(result);
                 },
                 Command.Divide => {
-                    const result = try division(tokens.items[1..], allocator);
+                    const result = try division(tokens.items, allocator);
                     try stdout.print("{s}\n", .{result});
                     allocator.free(result);
                 },

@@ -1,95 +1,6 @@
 const std = @import("std");
-
-const Command = enum { Exit, Add, Subtract, Multiply, Divide, Help, Unknown };
-
-fn parseCommand(input: []const u8) Command {
-    if (std.mem.eql(u8, input, "exit")) {
-        return Command.Exit;
-    } else if (std.mem.eql(u8, input, "+")) {
-        return Command.Add;
-    } else if (std.mem.eql(u8, input, "-")) {
-        return Command.Subtract;
-    } else if (std.mem.eql(u8, input, "*")) {
-        return Command.Multiply;
-    } else if (std.mem.eql(u8, input, "/")) {
-        return Command.Divide;
-    } else if (std.mem.eql(u8, input, "help")) {
-        return Command.Help;
-    } else {
-        return Command.Unknown;
-    }
-}
-
-fn castAsInt(input: []const u8) !i32 {
-    return std.fmt.parseInt(i32, input, 10);
-}
-
-fn castAsFloat(input: []const u8) !f32 {
-    return std.fmt.parseFloat(f32, input);
-}
-
-fn intToString(value: i32, allocator: std.mem.Allocator) ![]const u8 {
-    const result = try std.fmt.allocPrint(allocator, "{d}", .{value});
-    return result;
-}
-
-fn floatToString(value: f32, allocator: std.mem.Allocator) ![]const u8 {
-    const result = try std.fmt.allocPrint(allocator, "{d:.2}", .{value});
-    return result;
-}
-
-fn addition(input: [][]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    if (input.len != 3) {
-        return error.InvalidInput;
-    }
-
-    const first: i32 = try castAsInt(input[0]);
-    const second: i32 = try castAsInt(input[2]);
-    const sum: i32 = first + second;
-
-    return try intToString(sum, allocator);
-}
-
-fn subtraction(input: [][]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    if (input.len != 3) {
-        return error.InvalidInput;
-    }
-
-    const first: i32 = try castAsInt(input[0]);
-    const second: i32 = try castAsInt(input[2]);
-    const difference: i32 = first - second;
-
-    return try intToString(difference, allocator);
-}
-
-fn multiplication(input: [][]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    if (input.len != 3) {
-        return error.InvalidInput;
-    }
-
-    const first: i32 = try castAsInt(input[0]);
-    const second: i32 = try castAsInt(input[2]);
-    const product: i32 = first * second;
-
-    return try intToString(product, allocator);
-}
-
-fn division(input: [][]const u8, allocator: std.mem.Allocator) ![]const u8 {
-    if (input.len != 3) {
-        return error.InvalidInput;
-    }
-
-    const first: f32 = try castAsFloat(input[0]);
-    const second: f32 = try castAsFloat(input[2]);
-
-    if (@abs(second) < 1e-10) {
-        return error.DivisionByZero;
-    }
-
-    const quotient: f32 = first / second;
-
-    return try floatToString(quotient, allocator);
-}
+const Lexer = @import("lexer.zig").Lexer;
+const Parser = @import("parser.zig").Parser;
 
 pub fn main() !void {
     const stdin = std.io.getStdIn().reader();
@@ -97,62 +8,23 @@ pub fn main() !void {
 
     var buf: [256]u8 = undefined;
 
-    const allocator = std.heap.page_allocator;
-
     while (true) {
         try stdout.print("Enter a command (or 'exit' to quit): ", .{});
-
         const line = try stdin.readUntilDelimiterOrEof(&buf, '\n');
 
         if (line) |actualLine| {
             const input = std.mem.trimRight(u8, actualLine, "\r\n");
-            var iterator = std.mem.tokenizeAny(u8, input, " \t\n\r");
-
-            var tokens = std.ArrayList([]const u8).init(allocator);
-
-            while (iterator.next()) |token| {
-                try tokens.append(token);
-            }
+            var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+            defer _ = gpa.deinit();
+            const allocator = gpa.allocator();
+            var lexer = Lexer.init(input, allocator);
+            var tokens = try lexer.scanTokens();
             defer tokens.deinit();
 
-            std.debug.print("tokens: {s}\n", .{tokens.items});
+            var parser = Parser.init(tokens.items);
+            const result = try parser.parse();
 
-            const command = parseCommand(tokens.items[1]);
-
-            switch (command) {
-                Command.Exit => try stdout.print("Exit\n", .{}),
-                Command.Add => {
-                    const result = try addition(tokens.items, allocator);
-                    try stdout.print("{s}\n", .{result});
-                    allocator.free(result);
-                },
-                Command.Subtract => {
-                    const result = try subtraction(tokens.items, allocator);
-                    try stdout.print("{s}\n", .{result});
-                    allocator.free(result);
-                },
-                Command.Multiply => {
-                    const result = try multiplication(tokens.items, allocator);
-                    try stdout.print("{s}\n", .{result});
-                    allocator.free(result);
-                },
-                Command.Divide => {
-                    const result = try division(tokens.items, allocator);
-                    try stdout.print("{s}\n", .{result});
-                    allocator.free(result);
-                },
-                Command.Help => try stdout.print("Help\n", .{}),
-                Command.Unknown => try stdout.print("Unknown Command\n", .{}),
-            }
-        } else {
-            break;
+            std.debug.print("Result: {d}\n", .{result});
         }
     }
-}
-
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
 }

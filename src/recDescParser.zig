@@ -79,17 +79,26 @@ const Lexer = struct {
     }
 
     fn number(self: *Lexer) !void {
-        while (self.peek().? >= '0' and self.peek().? <= '9') {
+        while (true) {
+            const c = self.peek();
+            if (c == null or !isDigit(c.?)) break;
             _ = self.advance();
         }
 
         // Look for a decimal part
-        if (self.peek() == '.' and isDigit(self.peekNext() orelse '0')) {
-            // Consume the "."
-            _ = self.advance();
-
-            while (isDigit(self.peek().?)) {
+        if (self.peek() != null and self.peek().? == '.') {
+            // Check if the next character is a digit
+            const next = self.peekNext();
+            if (next != null and isDigit(next.?)) {
+                // Consume the "."
                 _ = self.advance();
+
+                // Consume digits after decimal
+                while (true) {
+                    const c = self.peek();
+                    if (c == null or !isDigit(c.?)) break;
+                    _ = self.advance();
+                }
             }
         }
 
@@ -131,6 +140,14 @@ fn isDigit(c: u8) bool {
     return c >= '0' and c <= '9';
 }
 
+const ParserError = error{
+    ParseError,
+    UnexpectedToken,
+    MissingRightParen,
+    InvalidNumber,
+    OutOfMemory,
+};
+
 // Parser structure
 const Parser = struct {
     tokens: []Token,
@@ -147,7 +164,7 @@ const Parser = struct {
         return try self.expression();
     }
 
-    fn expression(self: *Parser) !f64 {
+    fn expression(self: *Parser) ParserError!f64 {
         var result = try self.term();
 
         while (self.match(&[_]TokenType{ TokenType.Plus, TokenType.Minus })) {
@@ -245,6 +262,22 @@ pub fn main() !void {
     var lexer = Lexer.init(source, allocator);
     var tokens = try lexer.scanTokens();
     defer tokens.deinit();
+
+    std.debug.print("Tokens:\n", .{});
+    for (tokens.items, 0..) |token, i| {
+        // Print token type
+        std.debug.print("{d}: Type: {s}", .{ i, @tagName(token.type) });
+
+        // Print lexeme
+        std.debug.print(", Lexeme: '{s}'", .{token.lexeme});
+
+        // Print literal value if exists
+        if (token.literal) |value| {
+            std.debug.print(", Value: {d}", .{value});
+        }
+
+        std.debug.print("\n", .{});
+    }
 
     var parser = Parser.init(tokens.items);
     const result = try parser.parse();

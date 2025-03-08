@@ -1,7 +1,9 @@
 const Token = @import("token.zig").Token;
 const TokenType = @import("token.zig").TokenType;
+const Literal = @import("token.zig").Literal;
 const isDigit = @import("helperFunctions.zig").isDigit;
 const std = @import("std");
+const HashMap = @import("hashmap.zig").HashMap;
 
 const Allocator = std.mem.Allocator;
 
@@ -11,14 +13,16 @@ pub const Lexer = struct {
     start: usize,
     current: usize,
     allocator: Allocator,
+    map: *HashMap,
 
-    pub fn init(source: []const u8, allocator: Allocator) Lexer {
+    pub fn init(source: []const u8, allocator: Allocator, map: *HashMap) Lexer {
         return Lexer{
             .source = source,
             .tokens = std.ArrayList(Token).init(allocator),
             .start = 0,
             .current = 0,
             .allocator = allocator,
+            .map = map,
         };
     }
 
@@ -47,6 +51,8 @@ pub const Lexer = struct {
             else => {
                 if (isDigit(c)) {
                     try self.number();
+                } else if (self.map.contains(c)) {
+                    try self.constant();
                 } else {
                     std.debug.print("Unexpected character: {c}\n", .{c});
                 }
@@ -70,7 +76,16 @@ pub const Lexer = struct {
         }
 
         const value = try std.fmt.parseFloat(f64, self.source[self.start..self.current]);
-        try self.addTokenLiteral(TokenType.Number, value);
+        try self.addTokenLiteral(TokenType.Number, Literal{ .Float = value });
+    }
+
+    fn constant(self: *Lexer) !void {
+        while (self.peek().? >= 'a' and self.peek().? <= 'z') {
+            _ = self.advance();
+        }
+
+        const value = self.source[self.start..self.current];
+        try self.addTokenLiteral(TokenType.Constant, Literal{ .String = value });
     }
 
     fn isAtEnd(self: *Lexer) bool {
@@ -87,7 +102,7 @@ pub const Lexer = struct {
         try self.tokens.append(Token.init(token_type, text, null));
     }
 
-    fn addTokenLiteral(self: *Lexer, token_type: TokenType, literal: f64) !void {
+    fn addTokenLiteral(self: *Lexer, token_type: TokenType, literal: Literal) !void {
         const text = self.source[self.start..self.current];
         try self.tokens.append(Token.init(token_type, text, literal));
     }

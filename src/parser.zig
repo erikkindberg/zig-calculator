@@ -61,7 +61,14 @@ pub const Parser = struct {
 
     fn factor(self: *Parser) !f64 {
         if (self.match(&[_]TokenType{TokenType.Number})) {
-            return self.previous().literal.?;
+            const literal = self.previous().literal orelse return error.MissingLiteral;
+
+            // Check which variant of the union is active
+            if (@TypeOf(literal) == f64) {
+                return literal;
+            } else {
+                return error.InvalidLiteralType;
+            }
         }
 
         if (self.match(&[_]TokenType{TokenType.LeftParen})) {

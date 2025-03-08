@@ -51,7 +51,7 @@ pub const Lexer = struct {
             else => {
                 if (isDigit(c)) {
                     try self.number();
-                } else if (self.map.contains(c)) {
+                } else if (c >= 'a' and c <= 'z') {
                     try self.constant();
                 } else {
                     std.debug.print("Unexpected character: {c}\n", .{c});
@@ -85,7 +85,11 @@ pub const Lexer = struct {
         }
 
         const value = self.source[self.start..self.current];
-        try self.addTokenLiteral(TokenType.Constant, Literal{ .String = value });
+        if (self.map.contains(value)) {
+            try self.addTokenLiteral(TokenType.Constant, Literal{ .String = value });
+        } else {
+            std.debug.print("Constant not found: {s}\n", .{value});
+        }
     }
 
     fn isAtEnd(self: *Lexer) bool {

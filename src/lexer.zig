@@ -28,7 +28,6 @@ pub const Lexer = struct {
 
     pub fn scanTokens(self: *Lexer) !std.ArrayList(Token) {
         while (!self.isAtEnd()) {
-            // We are at the beginning of the next lexeme
             self.start = self.current;
             try self.scanToken();
         }
@@ -61,7 +60,9 @@ pub const Lexer = struct {
     }
 
     fn number(self: *Lexer) !void {
-        while (self.peek().? >= '0' and self.peek().? <= '9') {
+        while (true) {
+            const peeked = self.peek();
+            if (peeked == null or peeked.? < '0' or peeked.? > '9') break;
             _ = self.advance();
         }
 
@@ -80,10 +81,11 @@ pub const Lexer = struct {
     }
 
     fn constant(self: *Lexer) !void {
-        while (self.peek().? >= 'a' and self.peek().? <= 'z') {
+        while (true) {
+            const peeked = self.peek();
+            if (peeked == null or peeked.? < 'a' or peeked.? > 'z') break;
             _ = self.advance();
         }
-
         const value = self.source[self.start..self.current];
         if (self.map.contains(value)) {
             try self.addTokenLiteral(TokenType.Constant, Literal{ .String = value });

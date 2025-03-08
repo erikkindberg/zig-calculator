@@ -10,7 +10,7 @@ pub const TokenType = enum {
     EOF,
 };
 
-pub const Literal = union {
+pub const Literal = union(enum) {
     Float: f64,
     String: []const u8,
 };

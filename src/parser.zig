@@ -1,5 +1,7 @@
 const Token = @import("token.zig").Token;
 const TokenType = @import("token.zig").TokenType;
+const HashMap = @import("hashmap.zig").HashMap;
+const Literal = @import("token.zig").Literal;
 const std = @import("std");
 
 const ParserError = error{
@@ -8,16 +10,20 @@ const ParserError = error{
     MissingRightParen,
     InvalidNumber,
     OutOfMemory,
+    MissingLiteral,
+    InvalidLiteralType,
 };
 
 pub const Parser = struct {
     tokens: []Token,
     current: usize,
+    map: *HashMap,
 
-    pub fn init(tokens: []Token) Parser {
+    pub fn init(tokens: []Token, map: *HashMap) Parser {
         return Parser{
             .tokens = tokens,
             .current = 0,
+            .map = map,
         };
     }
 
@@ -61,14 +67,21 @@ pub const Parser = struct {
 
     fn factor(self: *Parser) !f64 {
         if (self.match(&[_]TokenType{TokenType.Number})) {
-            const literal = self.previous().literal orelse return error.MissingLiteral;
-
-            // Check which variant of the union is active
-            if (@TypeOf(literal) == f64) {
-                return literal;
-            } else {
-                return error.InvalidLiteralType;
+            const literal = self.previous().literal;
+            if (literal == null) {
+                return error.MissingLiteral;
             }
+
+            return switch (literal.?) {
+                .Float => literal.?.Float,
+                .String => {
+                    const value = self.map.get(literal.?.String) orelse {
+                        std.debug.print("Constant not found: {s}\n", .{literal.?.String});
+                        return error.InvalidLiteralType;
+                    };
+                    return value;
+                },
+            };
         }
 
         if (self.match(&[_]TokenType{TokenType.LeftParen})) {

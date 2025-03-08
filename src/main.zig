@@ -4,9 +4,10 @@ const Parser = @import("parser.zig").Parser;
 const HashMap = @import("hashmap.zig").HashMap;
 
 pub fn main() !void {
-    var hashmap_allocator = std.heap.page_allocator;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
 
-    var map = try HashMap.init(&hashmap_allocator, 10);
+    var map = try HashMap.init(gpa.allocator(), 10);
     defer map.deinit();
 
     const stdin = std.io.getStdIn().reader();
@@ -24,7 +25,7 @@ pub fn main() !void {
             const delimiter: u8 = ':';
             var parts = std.mem.splitScalar(u8, input, delimiter);
 
-            var parts_list = std.ArrayList([]const u8).init(hashmap_allocator);
+            var parts_list = std.ArrayList([]const u8).init(gpa.allocator());
             defer parts_list.deinit();
 
             while (parts.next()) |x| {
@@ -33,25 +34,38 @@ pub fn main() !void {
 
             const parts_slice = parts_list.items;
 
-            var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-            defer _ = gpa.deinit();
-
             const allocator = gpa.allocator();
 
             var lexer = Lexer.init(parts_slice[0], allocator, &map);
 
-            var tokens = try lexer.scanTokens();
+            const tokens = try lexer.scanTokens();
+
+            for (tokens.items) |token| {
+                std.debug.print("Token: {s}\n", .{token.lexeme});
+            }
+
             defer tokens.deinit();
 
-            var parser = Parser.init(tokens.items);
+            var parser = Parser.init(tokens.items, &map);
             const result = try parser.parse();
 
             if (parts_slice.len >= 2) {
-                try map.put(parts_slice[1], result);
-                try stdout.print("Result: {d}\nSaved to variable: {s}\n", .{ result, parts_slice[1] });
+                const var_name = std.mem.trim(u8, parts_slice[1], " \t\r\n");
+                const key_copy = try allocator.dupe(u8, var_name);
+                errdefer allocator.free(key_copy); // Add this
+
+                if (map.put(key_copy, result, allocator)) |_| {
+                    try stdout.print("Result: {d}\nSaved to variable: {s}\n", .{ result, var_name });
+                } else |err| {
+                    // HashMap put failed, free the key_copy
+                    allocator.free(key_copy);
+                    try stdout.print("Error saving variable: {s}\n", .{@errorName(err)});
+                }
             } else {
                 try stdout.print("Result: {d}\n", .{result});
             }
+
+            map.printAllKeys();
         }
     }
 }

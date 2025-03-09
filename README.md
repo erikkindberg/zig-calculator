@@ -25,6 +25,8 @@ To build and run the project, follow these steps:
     ```
 * As long as the project is running, you can then use the constant as a stand-in for a previously calculated expression
 ## TODO
+* Make error handling less of a hatchet job
+* Ditto with logging
 * Delete constants from memory
 * Implied multiplication 
     ```

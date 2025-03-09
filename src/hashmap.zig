@@ -150,7 +150,7 @@ pub const HashMap = struct {
 
         var count: usize = 0;
 
-        for (self.entries, 0..) |*entry, i| {
+        for (self.entries) |*entry| {
             if (entry.is_occupied) {
                 std.debug.print("{d}: {s} = {d}\n", .{ count, entry.key, entry.value });
                 count += 1;

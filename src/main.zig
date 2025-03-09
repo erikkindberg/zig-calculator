@@ -22,6 +22,12 @@ pub fn main() !void {
         if (line) |actualLine| {
             const input = std.mem.trimRight(u8, actualLine, "\r\n");
 
+            // First, handle the exit command early
+            if (std.mem.eql(u8, input, "exit")) {
+                std.debug.print("Exiting program...\n", .{});
+                break;
+            }
+
             const delimiter: u8 = ':';
             var parts = std.mem.splitScalar(u8, input, delimiter);
 
@@ -47,20 +53,35 @@ pub fn main() !void {
             defer tokens.deinit();
 
             var parser = Parser.init(tokens.items, &map);
-            const result = try parser.parse();
+            const result = parser.parse() catch |err| {
+                std.debug.print("Error parsing expression: {s}\n", .{@errorName(err)});
+                continue; // Skip to the next command, don't try to save variables
+            };
 
             if (parts_slice.len >= 2) {
                 const var_name = std.mem.trim(u8, parts_slice[1], " \t\r\n");
-                const key_copy = try allocator.dupe(u8, var_name);
-                errdefer allocator.free(key_copy); // Add this
 
-                if (map.put(key_copy, result, allocator)) |_| {
-                    try stdout.print("Result: {d}\nSaved to variable: {s}\n", .{ result, var_name });
-                } else |err| {
+                // Create a key_copy inside a scope with a defer to handle errors
+                const key_copy = blk: {
+                    const kc = allocator.dupe(u8, var_name) catch {
+                        std.debug.print("Memory allocation failed for variable name\n", .{});
+                        continue; // Skip to next command
+                    };
+                    break :blk kc;
+                };
+
+                // Use an errdefer to free key_copy if map.put fails
+                errdefer allocator.free(key_copy);
+
+                // Store the result in the HashMap
+                map.put(key_copy, result, allocator) catch |err| {
                     // HashMap put failed, free the key_copy
                     allocator.free(key_copy);
-                    try stdout.print("Error saving variable: {s}\n", .{@errorName(err)});
-                }
+                    std.debug.print("Error saving variable: {s}\n", .{@errorName(err)});
+                    continue;
+                };
+
+                try stdout.print("Result: {d}\nSaved to variable: {s}\n", .{ result, var_name });
             } else {
                 try stdout.print("Result: {d}\n", .{result});
             }

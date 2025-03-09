@@ -74,22 +74,38 @@ pub const Parser = struct {
 
             return switch (literal.?) {
                 .Float => literal.?.Float,
-                .String => {
-                    const value = self.map.get(literal.?.String) orelse {
-                        std.debug.print("Constant not found: {s}\n", .{literal.?.String});
-                        return error.InvalidLiteralType;
-                    };
-                    return value;
-                },
+                .String => error.InvalidLiteralType,
             };
         }
 
+        if (self.match(&[_]TokenType{TokenType.Constant})) {
+            const literal = self.previous().literal;
+            if (literal == null) {
+                return error.MissingLiteral;
+            }
+
+            return switch (literal.?) {
+                .String => |var_name| {
+                    if (self.map.get(var_name)) |value| {
+                        return value;
+                    } else {
+                        std.debug.print("Undefined variable: '{s}'\n", .{var_name});
+                        return error.ParseError;
+                    }
+                },
+                .Float => {
+                    std.debug.print("Expected variable name, got number\n", .{});
+                    return error.InvalidLiteralType;
+                },
+            };
+        }
         if (self.match(&[_]TokenType{TokenType.LeftParen})) {
             const expr = try self.expression();
             _ = try self.consume(TokenType.RightParen, "Expect ')' after expression.");
             return expr;
         }
 
+        std.debug.print("Expected number, variable, or '(', but got {s}\n", .{@tagName(self.peek().type)});
         return error.ParseError;
     }
 
